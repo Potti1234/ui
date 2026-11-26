@@ -8,7 +8,7 @@ import {
 import { Html } from "@effect/ui/html"
 import { Locator, TestHost } from "@effect/ui/testing"
 import { assert, describe, it } from "@effect/vitest"
-import { Effect, Layer, Schema } from "effect"
+import { Cause, Effect, Layer, Schema } from "effect"
 import { Dialog, type Item, Menu } from "./html/fixtures/headless.ts"
 
 const provideHost = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
@@ -513,6 +513,78 @@ describe("headless components", () => {
           "/Waiting/Consumer[c] fallback"
         ])
         assert.strictEqual(root.text(), "consumer down")
+      })))
+  }
+
+  for (const where of ["view", "closure"] as const) {
+    it.effect(`a ${where} that returns an array fails instead of rendering nothing`, () =>
+      provideHost(Effect.gen(function*() {
+        const DisclosureMessage = UiSchema.TaggedEnum({ Toggled: {} })
+        const Disclosure = Html.component({
+          name: "Disclosure",
+          model: Schema.Boolean,
+          message: DisclosureMessage
+        }).make({
+          init: () => false,
+          update: { Toggled: ($) => !$.model },
+          parts: (p, open) => ({
+            open,
+            trigger: p.part(
+              "button",
+              (button) => button.on("click", DisclosureMessage.Toggled())
+            )
+          })
+        })
+        const Pair = Html.component({
+          name: "Pair",
+          model: Schema.Null,
+          message: Schema.Never
+        }).make({
+          init: () => null,
+          update: ($) => $.model,
+          view: (h) =>
+            [h.button("Toggle"), h.output("false")] as unknown as View.Node<
+              never,
+              never
+            >
+        })
+        const Parent = Html.component({
+          name: "Parent",
+          model: Schema.Null,
+          message: Schema.Never
+        }).make({
+          init: () => null,
+          update: ($) => $.model,
+          view: (h) =>
+            h.div(
+              where === "view"
+                ? Pair(h, { key: "d" })
+                : Disclosure(h, {
+                  key: "d",
+                  view: (disclosure) =>
+                    [
+                      disclosure.trigger(h.button).children("Toggle"),
+                      h.output(String(disclosure.open))
+                    ] as unknown as View.Node<never, never>
+                })
+            )
+        })
+        const root = yield* TestHost.mount(Parent, {})
+        yield* TestHost.settle
+        assert.deepStrictEqual(failures(root), [
+          where === "view"
+            ? "/Parent/Pair[d] view"
+            : "/Parent/Disclosure[d] view"
+        ])
+        assert.strictEqual(root.text(), "")
+        assert.include(
+          Cause.pretty(
+            root.log().find((entry): entry is MessageLog.Failed =>
+              entry._tag === "Failed"
+            )!.cause
+          ),
+          "a view returns one node, and was given an array"
+        )
       })))
   }
 })

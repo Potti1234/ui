@@ -703,8 +703,16 @@ export const isElementBuilder = (
  * @category constructors
  * @since 0.1.0
  */
-export const toNode = <Msg, R>(content: Content<Msg, R>): Node<Msg, R> =>
-  content instanceof ElementBuilder ? buildWith(content, noChildren) : content
+export const toNode = <Msg, R>(content: Content<Msg, R>): Node<Msg, R> => {
+  if (content instanceof ElementBuilder) return buildWith(content, noChildren)
+  // An array would otherwise reach the renderer as a node and draw nothing.
+  if (Array.isArray(content)) {
+    throw new Error(
+      "a view returns one node, and was given an array: put its items in an element, such as h.div(items)"
+    )
+  }
+  return content
+}
 
 /**
  * Builds the element node a builder describes: the children it holds, then
