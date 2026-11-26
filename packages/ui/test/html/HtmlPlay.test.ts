@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import type { Component } from "@effect/ui"
+import { type Component, UiSchema } from "@effect/ui"
 import { BrowserHost, Html, HtmlSubscription } from "@effect/ui/html"
 import { HtmlLocator, HtmlPlay } from "@effect/ui/html/testing"
 import { Locator, TestHost } from "@effect/ui/testing"
@@ -86,6 +86,63 @@ const Shortcuts = Html.component({
 })
 
 describe("HtmlPlay", () => {
+  it.effect("a forwarded click in a headless part keeps its owner", () =>
+    Effect.gen(function*() {
+      const ChildMessage = UiSchema.TaggedEnum({ ChildPressed: {} })
+      const Child = Html.component({
+        name: "Child",
+        model: Schema.Boolean,
+        message: ChildMessage
+      }).make({
+        init: () => false,
+        update: { ChildPressed: () => true },
+        parts: (p, pressed) => ({
+          pressed,
+          trigger: p.part(
+            "button",
+            (button) =>
+              button.forward((node) =>
+                node.on("click", ChildMessage.ChildPressed())
+              )
+          )
+        })
+      })
+      const ParentMessage = UiSchema.TaggedEnum({ ParentPressed: {} })
+      const Parent = Html.component({
+        name: "Parent",
+        model: Schema.Number,
+        message: ParentMessage
+      }).make({
+        init: () => 0,
+        update: { ParentPressed: ($) => $.model + 1 },
+        view: (h, presses) =>
+          Child(h, {
+            view: (child) =>
+              h.div(
+                child.trigger(
+                  h.button.forward((node) =>
+                    node.on("click", ParentMessage.ParentPressed())
+                  )
+                )
+                  .children("Press"),
+                h.output(String(child.pressed) + ":" + presses)
+              )
+          })
+      })
+      const press = HtmlLocator.role("button", { name: "Press" })
+      yield* play(Effect.gen(function*() {
+        const parent = yield* HtmlPlay.make(Parent, {})
+        yield* parent.click(press)
+        yield* parent.expect(log).toHaveText("true:1")
+      }))
+      const browser = yield* inBrowser(Parent, (app) => {
+        HtmlLocator.click(
+          HtmlLocator.getByRole(app, "button", { name: "Press" })
+        )
+      })
+      assert.strictEqual(browser, "true:1")
+    }))
+
   it.effect("type, keydown and a click's defaults send what BrowserHost sends", () =>
     Effect.gen(function*() {
       const browser = yield* inBrowser(Settings, (app) => {
