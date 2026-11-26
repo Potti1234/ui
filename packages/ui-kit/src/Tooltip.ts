@@ -25,7 +25,7 @@
  *
  * | Part         | Element                                        |
  * | :----------- | :--------------------------------------------- |
- * | `trigger`    | `<button>` the tooltip describes               |
+ * | `trigger`    | `<button>` or `<a>` the tooltip describes      |
  * | `positioner` | `<div>`, a manual popover placed by the tooltip  |
  * | `popup`      | `<div>` inside the positioner                  |
  * | `arrow`      | `<div>` inside the popup                       |
@@ -230,7 +230,7 @@ export type TooltipAlign = typeof TooltipAlign.Type
  *
  * - `open`: whether the tooltip shows. Required: the consumer owns it.
  * - `disabled`: the tooltip never shows and emits nothing. The trigger
- *   stays enabled: disable the button itself if it should be.
+ *   keeps its native behavior. Disable the button itself if it should be disabled.
  * - `delay`: milliseconds the pointer rests on the trigger before the
  *   tooltip opens, 600 by default.
  * - `closeDelay`: milliseconds after the pointer leaves the trigger, the
@@ -866,7 +866,7 @@ export const Tooltip = Html.component({
     const instant = <B extends Attributed<B>>(builder: B): B =>
       placed(builder).attr("data-instant", instantBy ?? undefined)
     const trigger = p.part(
-      "button",
+      ["button", "a"],
       (b) =>
         b.attrs({
           "data-popup-open": flag(shown),

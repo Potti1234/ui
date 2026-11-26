@@ -584,6 +584,41 @@ describe("Tooltip", () => {
       )
     }))
 
+  it.effect("keeps a link trigger native and opens its tooltip on keyboard focus", () =>
+    Effect.gen(function*() {
+      const scene = yield* HtmlScene.make(
+        Tooltip,
+        { open: false, describesTrigger: true },
+        {
+          elements: Html,
+          view: (tooltip, h) =>
+            h.div(
+              tooltip.trigger(h.a.attr("href", "#retention")).children(
+                "Retention policy"
+              ),
+              tooltip.positioner(h.div.class("positioner")).children(
+                tooltip.popup(h.div.class("popup")).children("30 days")
+              )
+            )
+        }
+      )
+      const link = Locator.tag("a")
+      const popup = Locator.attr("class", "popup")
+      assert.strictEqual(scene.get(link).attrs?.href, "#retention")
+      assert.strictEqual(
+        scene.get(link).attrs?.["aria-describedby"],
+        scene.get(popup).attrs?.id
+      )
+      scene.fire(link, "focus", { focusVisible: true }).emitted({
+        _tag: "RequestedOpen"
+      })
+      scene.props({ open: true, describesTrigger: true })
+      scene.expectMount(tracking(scene))
+      scene.fire(link, "click")
+        .emitted({ _tag: "RequestedClose" })
+        .expectDefaultPrevented(false)
+    }))
+
   it.effect("the placement the positioner reports reaches every part", () =>
     Effect.gen(function*() {
       const scene = yield* HtmlScene.make(
