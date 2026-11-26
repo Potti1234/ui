@@ -227,6 +227,28 @@ describe("NumberField in a document", { concurrent: false }, () => {
       assert.isTrue(blocks(eur.input, "€"))
     }))
 
+  it.effect("accepts both apostrophes for grouping in Swiss German", () =>
+    Effect.gen(function*() {
+      const { input, taken } = yield* mount({ locale: "de-CH" }, null)
+      for (
+        const [separator, value, text] of [
+          ["'", 1234.25, "1'234.25"],
+          ["’", 2345.75, "2’345.75"]
+        ] as const
+      ) {
+        assert.isFalse(blocks(input, separator))
+        select(input, "", 0)
+        assert.isTrue(paste(input, text))
+        yield* tick
+        assert.strictEqual(input.value, text)
+        assert.deepStrictEqual(taken(), ["updated " + value + " input-paste"])
+      }
+
+      const english = yield* mount({ locale: "en-US" }, null)
+      assert.isTrue(blocks(english.input, "'"))
+      assert.isTrue(blocks(english.input, "’"))
+    }).pipe(Effect.scoped))
+
   it.effect("inserts sanitized pasted text at the caret and drops non-numeric paste", () =>
     Effect.gen(function*() {
       const { input, taken } = yield* mount({ locale: "en-US" }, 0)
